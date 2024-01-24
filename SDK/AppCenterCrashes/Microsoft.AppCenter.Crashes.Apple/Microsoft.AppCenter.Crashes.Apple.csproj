@@ -1,11 +1,11 @@
 ﻿<?xml version="1.0" encoding="utf-8"?>
 <Project Sdk="Microsoft.NET.Sdk">
   <PropertyGroup>
-    <TargetFrameworks>net6.0-ios;net6.0-macos</TargetFrameworks>
+    <TargetFrameworks>net6.0-ios;net6.0-maccatalyst;net6.0-macos</TargetFrameworks>
     <IsBindingProject>true</IsBindingProject>
     <NoBindingEmbedding>false</NoBindingEmbedding>
   </PropertyGroup>
-  <PropertyGroup Condition="$(TargetFramework.EndsWith('-ios'))">
+  <PropertyGroup Condition="$(TargetFramework.EndsWith('-ios')) Or $(TargetFramework.EndsWith('-maccatalyst'))">
     <SupportedOSPlatformVersion>10.0</SupportedOSPlatformVersion>
     <MtouchLink>SdkOnly</MtouchLink>
     <MtouchHttpClientHandler>HttpClientHandler</MtouchHttpClientHandler>
@@ -24,6 +24,14 @@
   </ItemGroup>
   <ItemGroup Condition="$(TargetFramework.EndsWith('-ios'))">
     <NativeReference Include="..\..\..\externals\apple\ios\AppCenterCrashes.a">
+      <Kind>Static</Kind>
+      <ForceLoad>True</ForceLoad>
+      <LinkerFlags>-lc++</LinkerFlags>
+      <IsCxx>True</IsCxx>
+    </NativeReference>
+  </ItemGroup>
+  <ItemGroup Condition="$(TargetFramework.EndsWith('-maccatalyst'))">
+    <NativeReference Include="..\..\..\externals\apple-maccatalyst\AppCenterCrashes.a">
       <Kind>Static</Kind>
       <ForceLoad>True</ForceLoad>
       <LinkerFlags>-lc++</LinkerFlags>

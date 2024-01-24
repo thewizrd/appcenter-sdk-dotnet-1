@@ -30,6 +30,7 @@ IList<AppCenterModule> AppCenterModules = null;
 var ExternalsDirectory = "externals";
 var AndroidExternals = $"{ExternalsDirectory}/android";
 var AppleExternals = $"{ExternalsDirectory}/apple";
+var AppleMacCatalystExternals = $"{ExternalsDirectory}/apple-maccatalyst";
 
 var SdkStorageUrl = "https://mobilecentersdkdev.blob.core.windows.net/sdk/";
 
@@ -37,6 +38,7 @@ var SdkStorageUrl = "https://mobilecentersdkdev.blob.core.windows.net/sdk/";
 VersionReader.ReadVersions();
 var AndroidUrl = $"{SdkStorageUrl}AppCenter-SDK-Android-{VersionReader.AndroidVersion}.zip";
 var AppleUrl = $"{SdkStorageUrl}AppCenter-SDK-Apple-{VersionReader.AppleVersion}.zip";
+var AppleMacCatalystUrl = $"{SdkStorageUrl}AppCenter-SDK-Apple-XCFramework-{VersionReader.AppleVersion}.zip";
 
 // Task Target for build
 var Target = Argument("Target", Argument("t", "Default"));
@@ -177,8 +179,63 @@ Task("Externals-Apple")
 
 }).OnError(HandleError);
 
+// Downloading MacCatalyst binaries.
+Task("Externals-Apple-MacCatalyst")
+    .WithCriteria(() => IsRunningOnUnix())
+    .Does(() =>
+{
+    var zipFile = System.IO.Path.Combine(AppleMacCatalystExternals, "maccatalyst.zip");
+    if (FileExists(zipFile))
+    {
+        return;
+    }
+    CleanDirectory(AppleMacCatalystExternals);
+
+    // Download zip file.
+    var authParams = Argument("StorageAuthParams", EnvironmentVariable("STORAGE_AUTH_PARAMS"));
+    var artifactUrl = $"{AppleMacCatalystUrl}{authParams}";
+    using (VerboseVerbosity())
+        DownloadFile(artifactUrl, zipFile);
+    using(var process = StartAndReturnProcess("unzip",
+        new ProcessSettings
+        {
+            Arguments = new ProcessArgumentBuilder()
+                .Append(zipFile)
+                .Append("-d")
+                .Append(AppleMacCatalystExternals),
+            RedirectStandardOutput = true,
+        }))
+    {
+        process.WaitForExit(10000);
+        if (process.GetExitCode() != 0)
+        {
+            throw new Exception($"Failed to unzip {zipFile}");
+        }
+    }
+
+    var maccatalystFrameworksLocation = System.IO.Path.Combine(AppleMacCatalystExternals, "AppCenter-SDK-Apple");
+
+    // Move maccatalyst frameworks.
+    CleanDirectory(AppleMacCatalystExternals);
+    var frameworks = GetDirectories($"{maccatalystFrameworksLocation}/*.xcframework/ios-arm64_x86_64-maccatalyst/*.framework");
+    foreach (var frameworkDir in frameworks)
+    {
+        var dirName = frameworkDir.GetDirectoryName();
+        MoveDirectory(frameworkDir, $"{AppleMacCatalystExternals}/{dirName}");
+    }
+
+    // Copy binaries for net-6.0 projects
+    files = GetFiles($"{AppleMacCatalystExternals}/*.framework/Versions/A/AppCenter*");
+    foreach (var file in files)
+    {
+        var filename = file.GetFilename();
+        CopyFile(file, $"{AppleMacCatalystExternals}/{filename}.a");
+    }
+
+}).OnError(HandleError);
+
 // Create a common externals task depending on platform specific ones
-Task("Externals").IsDependentOn("Externals-Apple").IsDependentOn("Externals-Android");
+Task("Externals").IsDependentOn("Externals-Apple-MacCatalyst").IsDependentOn("Externals-Apple").IsDependentOn("Externals-Android");
 
 // Main Task.
 Task("Default")
